@@ -1,6 +1,6 @@
 # Church Flow — Product Requirements Document (PRD)
 
-**Versão:** 1.0  
+**Versão:** 1.1  
 **Status:** Draft — Aguardando Aprovação  
 **Data:** 2026-06-15  
 **Dependência:** `00-vision.md` (Aprovado)  
@@ -10,11 +10,30 @@
 
 ## 1. Objetivo do Produto
 
-O **Church Flow** é uma plataforma SaaS multi-tenant para gestão administrativa de igrejas. Seu objetivo é centralizar em um único sistema as operações administrativas que hoje são realizadas de forma fragmentada — planilhas, WhatsApp, papel físico e sistemas isolados — entregando controle financeiro, gestão de membros, patrimônio, eventos e auditoria com a qualidade, segurança e experiência de um produto de software moderno.
+O **Church Flow** é uma plataforma SaaS multi-tenant para **gestão administrativa e financeira de igrejas**. Seu objetivo é centralizar em um único sistema as operações que hoje são realizadas de forma fragmentada — planilhas, WhatsApp, papel físico e sistemas isolados — entregando controle financeiro, gestão de patrimônio, eventos, organização por departamentos e auditoria com a qualidade, segurança e experiência de um produto de software moderno.
+
+O Church Flow organiza **usuários do sistema** (não o cadastro completo da congregação) em departamentos e ministérios para fins operacionais. Gestão pastoral individual, controle de frequência de membros e acompanhamento congregacional não fazem parte do escopo da V1.
 
 O produto resolve um problema real de organizações religiosas que cresceram operacionalmente mas não têm ferramentas adequadas para gerir essa complexidade com transparência e confiabilidade.
 
 A V1 será uma versão **comercialmente viável**, pronta para produção, com clientes reais pagando assinatura recorrente.
+
+---
+
+## 1.1 Regras de Negócio Fundamentais
+
+As seguintes regras foram definidas e **não são negociáveis** para a V1. Qualquer decisão de arquitetura, schema ou implementação deve respeitar estes invariantes.
+
+| # | Regra | Impacto |
+|---|---|---|
+| RN-001 | Uma igreja pode ter múltiplos usuários | Relação 1:N entre `churches` e `users`; `church_id` FK no usuário |
+| RN-002 | Um usuário pertence a **exatamente uma** igreja | Sem tabela de junção `user_churches`; sem troca de tenant em sessão |
+| RN-003 | Uma igreja pode ter múltiplos departamentos | Relação 1:N entre `churches` e `departments` |
+| RN-004 | Um departamento pode ter múltiplos líderes com permissões iguais | Tabela de junção `department_leaders`; sem campo de hierarquia entre líderes |
+| RN-005 | Toda movimentação financeira pertence **obrigatoriamente** a uma igreja | `church_id` NOT NULL em `financial_transactions`; não editável após criação |
+| RN-006 | Uma assinatura ativa é **obrigatória** para acesso ao sistema | Guard global de assinatura em todas as rotas autenticadas |
+| RN-007 | Tenant suspenso tem acesso **totalmente bloqueado** — regularização via suporte | Sem auto-serviço de billing durante suspensão; requer fluxo de suporte definido |
+| RN-008 | Church Flow é uma plataforma de **gestão administrativa e financeira** | Gestão pastoral individual, cadastro de congregantes e escalas estão fora do escopo da V1 |
 
 ---
 
@@ -45,8 +64,8 @@ A seguir estão todos os módulos e funcionalidades que **obrigatoriamente** faz
 
 ### Departamentos
 - [ ] Cadastro de departamentos e ministérios
-- [ ] Atribuição de líder responsável
-- [ ] Vinculação de membros a departamentos
+- [ ] Atribuição de múltiplos líderes por departamento (permissões iguais entre líderes)
+- [ ] Vinculação de colaboradores (usuários do sistema) a departamentos
 
 ### Financeiro
 - [ ] Lançamento de receitas e despesas
@@ -102,8 +121,12 @@ Os itens abaixo são funcionalidades planejadas para versões futuras. Não deve
 | App de check-in autônomo (totem) | Avaliar com base no uso do módulo de eventos |
 | Comunicação interna (chat) | WhatsApp resolve para V1; feature requer alta retensão antes de valer |
 | Integração com bancos (Open Finance) | Complexidade regulatória; avaliar em V2 |
-| Módulo de escalas e voluntários | Avaliar demanda após lançamento |
+| Escalas e controle de voluntários | Avaliar demanda após lançamento; não é gestão administrativa core |
 | Controle de estoque | Fora do escopo de patrimônio definido para V1 |
+| **Gestão completa de membros da congregação** | **V1 não possui cadastro individual de congregantes. Apenas usuários do sistema são gerenciados.** |
+| **Acompanhamento pastoral individual** | Dados pastorais (saúde, família, visitas, aniversários) fora do escopo da V1 |
+| **Controle de presença de membros nos cultos** | Presença em eventos existe para controle operacional de eventos cadastrados, não para rastreamento pastoral contínuo |
+| **Escalas de voluntários e ministério** | Feature operacional de ministério; avaliar demanda na V2 |
 
 ---
 
@@ -271,30 +294,39 @@ Controlar quem tem acesso à plataforma, com quais permissões, garantindo que c
 ### 4.4 Módulo: Departamentos
 
 #### Objetivo
-Organizar a estrutura ministerial da igreja em departamentos, permitindo segmentação de membros, responsabilidades e futuramente acesso a relatórios por ministério.
+Organizar a estrutura operacional da igreja em departamentos e ministérios, agrupando **usuários do sistema** (colaboradores e líderes) para fins administrativos, financeiros e de controle de eventos. Não é um módulo de gestão pastoral de congregantes.
 
 #### Usuários Envolvidos
-- CHURCH_ADMIN / SECRETARY — Cadastro e gestão
-- DEPARTMENT_LEADER — Visualização do próprio departamento
-- Qualquer usuário — Visualização da estrutura (somente leitura)
+- CHURCH_ADMIN / SECRETARY — Cadastro e gestão completa
+- DEPARTMENT_LEADER — Visualização do próprio departamento e seus colaboradores
+- Demais usuários — Visualização da estrutura (somente leitura)
+
+#### Regras de Negócio
+- Um departamento pode ter **múltiplos líderes**
+- Todos os líderes de um departamento têm **permissões iguais** entre si dentro do departamento — não há hierarquia de líder principal vs. co-líder
+- O papel `DEPARTMENT_LEADER` é atribuído no nível do sistema (role do usuário) e associado a um ou mais departamentos
+- Colaboradores de um departamento são **usuários do sistema** (com conta ativa), não congregantes sem acesso
 
 #### Funcionalidades
-- Criação de departamentos com: nome, descrição, cor de identificação, líder responsável (usuário do sistema), status (ativo/inativo)
+- Criação de departamentos com: nome, descrição, cor de identificação, status (ativo/inativo)
 - Hierarquia de no máximo 2 níveis (departamento pai → sub-departamento)
-- Vinculação de membros (usuários) a departamentos (um membro pode estar em múltiplos departamentos)
+- Atribuição de **múltiplos líderes** por departamento via tabela de associação (`department_leaders`)
+- Vinculação de colaboradores (usuários do sistema) a departamentos — um colaborador pode estar em múltiplos departamentos
 - Visualização em lista e em estrutura hierárquica (árvore)
-- Histórico de líderes anteriores (com data de início e fim)
+- Histórico de líderes com data de entrada e saída
 - Inativação de departamento preserva histórico (soft delete)
 
 #### Dependências
-- Módulo de Usuários (atribuição de líder e membros)
+- Módulo de Usuários (atribuição de líderes e colaboradores)
 - Módulo de Auditoria
 
 #### Critérios de Aceite
-- [ ] Admin consegue criar um departamento com nome e líder em menos de 1 minuto
-- [ ] Sistema não permite mais de 2 níveis de hierarquia
+- [ ] Admin consegue criar um departamento e atribuir múltiplos líderes em menos de 2 minutos
+- [ ] Sistema não permite mais de 2 níveis de hierarquia de departamentos
+- [ ] Todos os líderes de um departamento têm as mesmas permissões — não existe distinção de hierarquia entre eles
 - [ ] Inativar um departamento pai não inativa automaticamente os sub-departamentos — requer confirmação separada
-- [ ] Líder de departamento vê apenas os membros do seu departamento, não de outros
+- [ ] Um departamento pode ter zero líderes (criado sem líder atribuído ainda)
+- [ ] Líder de departamento vê apenas os colaboradores do seu departamento, não de outros
 - [ ] Estrutura de departamentos é exibida corretamente em dispositivos móveis
 
 ---
@@ -434,7 +466,7 @@ Criar e manter um inventário completo dos bens da igreja com histórico de movi
 ### 4.7 Módulo: Eventos
 
 #### Objetivo
-Centralizar o planejamento, organização e acompanhamento de eventos da igreja, eliminando conflitos de agenda e permitindo controle de presença e orçamento.
+Centralizar o planejamento, organização e acompanhamento de eventos da igreja, eliminando conflitos de agenda e permitindo controle operacional de presença e orçamento. O controle de presença deste módulo é estritamente operacional — registra participação em eventos cadastrados, não substitui acompanhamento pastoral individual ou controle de frequência congregacional.
 
 #### Usuários Envolvidos
 - CHURCH_ADMIN / SECRETARY — Criação e gestão completa
@@ -735,9 +767,12 @@ Todo evento auditável gera um registro com:
 |---|---|
 | RF-013 | Todos os dados da plataforma devem ser isolados por tenant via `church_id` |
 | RF-014 | Nenhuma requisição autenticada deve acessar dados de outro tenant |
-| RF-015 | Um usuário pode pertencer a múltiplos tenants com papéis diferentes em cada um |
-| RF-016 | O tenant ativo deve ser identificado no contexto de cada requisição autenticada |
-| RF-017 | Status do tenant (trial, active, suspended, cancelled) deve ser verificado em cada requisição |
+| RF-015 | Um usuário pertence a **exatamente uma igreja**. Acesso a múltiplas igrejas requer contas separadas. Não há troca de tenant na V1. |
+| RF-016 | O tenant do usuário autenticado é resolvido a partir do seu próprio registro — não via seleção na sessão |
+| RF-017 | Status do tenant (trial, active, suspended, cancelled) deve ser verificado em cada requisição autenticada |
+| RF-017a | Tenant com status `suspended` ou `cancelled` tem **acesso totalmente bloqueado** à plataforma — o CHURCH_ADMIN deve contatar o suporte da Church Flow para regularização |
+| RF-017b | Toda movimentação financeira pertence obrigatoriamente a uma igreja (`church_id` não nulo e não editável após criação) |
+| RF-017c | Uma assinatura ativa (status `trial` ou `active`) é requisito obrigatório para acesso à plataforma |
 
 ### RF — RBAC e Permissões
 
@@ -781,12 +816,14 @@ Todo evento auditável gera um registro com:
 
 | ID | Requisito |
 |---|---|
-| RF-041 | O sistema deve permitir criação de departamentos com nome, descrição e líder responsável |
-| RF-042 | Hierarquia de departamentos deve ser limitada a 2 níveis |
-| RF-043 | Um usuário pode pertencer a múltiplos departamentos simultaneamente |
-| RF-044 | DEPARTMENT_LEADER deve ter acesso restrito aos dados do seu departamento |
+| RF-041 | O sistema deve permitir criação de departamentos com nome, descrição e status |
+| RF-042 | Hierarquia de departamentos deve ser limitada a 2 níveis (pai → filho) |
+| RF-043 | Um departamento pode ter **múltiplos líderes**; todos com permissões iguais entre si |
+| RF-044 | Um usuário (colaborador) pode estar vinculado a múltiplos departamentos simultaneamente |
+| RF-044a | DEPARTMENT_LEADER tem acesso restrito aos dados do seu departamento; não vê outros departamentos |
 | RF-045 | Inativação de departamento deve preservar histórico (soft delete) |
-| RF-046 | O sistema deve registrar histórico de líderes anteriores com data de início e fim |
+| RF-046 | O sistema deve registrar histórico de líderes por departamento com data de entrada e saída |
+| RF-046a | Um departamento pode existir sem líder atribuído |
 
 ### RF — Financeiro
 
@@ -858,13 +895,15 @@ Todo evento auditável gera um registro com:
 | ID | Requisito |
 |---|---|
 | RF-087 | O sistema deve integrar com Stripe para criação e gestão de assinaturas recorrentes |
-| RF-088 | Plano de assinatura deve ser vinculado ao tenant |
+| RF-088 | Plano de assinatura deve ser vinculado ao tenant (`church_id`) |
 | RF-089 | O sistema deve suportar período de trial configurável antes da primeira cobrança |
-| RF-090 | Acesso ao tenant deve ser suspenso após inadimplência vencido o período de graça |
-| RF-091 | CHURCH_ADMIN deve poder atualizar dados de pagamento via Stripe Customer Portal |
-| RF-092 | O sistema deve processar webhooks Stripe para atualizar status de assinatura |
-| RF-093 | O sistema deve registrar histórico de faturas acessível ao CHURCH_ADMIN |
-| RF-094 | Em caso de falha de pagamento, sistema deve enviar notificação por email e in-app |
+| RF-090 | Uma assinatura ativa (status `trial` ou `active`) é **obrigatória** para acesso à plataforma — sem assinatura ativa, nenhuma rota autenticada é acessível |
+| RF-091 | Tenant com assinatura `suspended` ou `cancelled` tem **acesso totalmente bloqueado** — o CHURCH_ADMIN deve entrar em contato com o suporte da Church Flow para regularização |
+| RF-092 | CHURCH_ADMIN deve poder atualizar dados de pagamento via Stripe Customer Portal |
+| RF-093 | O sistema deve processar webhooks Stripe para atualizar status de assinatura em tempo real |
+| RF-094 | O sistema deve registrar histórico de faturas acessível ao CHURCH_ADMIN |
+| RF-095 | Em caso de falha de pagamento, sistema deve enviar notificação por email ao CHURCH_ADMIN antes da suspensão |
+| RF-096 | Período de graça após falha de pagamento deve ser configurável antes do bloqueio definitivo |
 
 ---
 
@@ -990,19 +1029,33 @@ Os itens abaixo precisam ser definidos antes da modelagem do banco de dados e in
 
 | # | Questão | Impacto | Urgência |
 |---|---|---|---|
+### Decisões Resolvidas
+
+| # | Decisão | Resolução |
+|---|---|---|
+| DEC-R01 | **Usuário pertence a quantas igrejas?** | Exatamente **uma**. Acesso multi-igreja requer contas separadas. |
+| DEC-R02 | **Hierarquia entre líderes de departamento?** | Não existe. Todos os líderes de um departamento têm **permissões iguais**. |
+| DEC-R03 | **Acesso durante suspensão de assinatura?** | **Bloqueio total**. Regularização via contato com suporte da Church Flow. |
+| DEC-R04 | **Gestão de membros da congregação na V1?** | **Fora do escopo**. V1 gerencia apenas usuários do sistema organizados em departamentos. |
+
+### Decisões Pendentes
+
+| # | Questão | Impacto | Urgência |
+|---|---|---|---|
 | DEC-001 | **Duração do trial period** — 7, 14 ou 30 dias? | Lógica de status do tenant, webhooks Stripe | Alta |
 | DEC-002 | **Período de graça após inadimplência** — quantos dias antes do bloqueio? | Lógica de acesso do tenant, notificações | Alta |
 | DEC-003 | **Identificação do tenant na requisição** — subdomain (`tenant.churchflow.app`), path (`/t/tenant-id`) ou header (`X-Tenant-ID`)? | Arquitetura de roteamento, URL pattern, SEO | Alta |
 | DEC-004 | **Política de senha** — requisitos mínimos (comprimento, complexidade)? | Validação em frontend e backend | Média |
 | DEC-005 | **Retenção de logs de auditoria** — indefinida ou com política de arquivamento após X anos? | Schema e estratégia de particionamento | Média |
-| DEC-006 | **Soft delete vs. hard delete para usuários** — usuário desativado mantém todos os registros vinculados? Ou anonimiza dados pessoais após X meses? | LGPD, schema de usuários | Alta |
+| DEC-006 | **Soft delete para usuários (LGPD)** — usuário desativado mantém dados indefinidamente ou anonimiza após X meses? | LGPD, schema de usuários | Alta |
 | DEC-007 | **Multi-idioma (i18n)** — V1 apenas PT-BR ou estrutura i18n desde o início? | Arquitetura de strings no frontend | Média |
-| DEC-008 | **Limite de usuários por plano** — cada plano terá um teto de usuários além do teto de membros? | Schema de planos, lógica de convite | Alta |
-| DEC-009 | **Tamanho máximo de armazenamento MinIO por tenant** — existe cota por plano? | Schema de planos, lógica de upload | Média |
-| DEC-010 | **Domínio e subdomínio de produção** — `churchflow.com.br`? Afeta configuração de email, Stripe e certificados | Infraestrutura, DNS, Resend sender | Alta |
-| DEC-011 | **Política de exportação de dados (LGPD)** — usuário ou admin pode solicitar exportação de todos os dados do tenant? | Requisito legal, feature de compliance | Média |
-| DEC-012 | **Categorias financeiras padrão** — quais categorias são pré-criadas no onboarding de um novo tenant? | Seed de dados, onboarding experience | Baixa |
-| DEC-013 | **Nomenclatura de planos** — quais serão os nomes dos planos no Stripe? (afeta Stripe Products e metadata) | Integração Stripe | Alta |
+| DEC-008 | **Limite de usuários por plano** — cada plano terá teto de usuários do sistema? | Schema de planos, lógica de convite | Alta |
+| DEC-009 | **Cota de armazenamento MinIO por tenant** — existe limite por plano? | Schema de planos, lógica de upload | Média |
+| DEC-010 | **Domínio de produção** — `churchflow.com.br`? Afeta email, Stripe e certificados | Infraestrutura, DNS, Resend sender | Alta |
+| DEC-011 | **Exportação de dados (LGPD)** — admin pode solicitar exportação completa do tenant? | Requisito legal, feature de compliance | Média |
+| DEC-012 | **Categorias financeiras padrão** — quais categorias são pré-criadas no onboarding? | Seed de dados, onboarding experience | Baixa |
+| DEC-013 | **Nomenclatura de planos no Stripe** — nomes dos produtos no Stripe (afeta metadata e webhooks) | Integração Stripe | Alta |
+| DEC-014 | **Fluxo de suporte para suspensão** — qual o canal e SLA para CHURCH_ADMIN regularizar assinatura suspensa? | Experiência do cliente, churn risk | Alta |
 
 ---
 
