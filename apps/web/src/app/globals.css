@@ -1,0 +1,10 @@
+/* Design tokens must be imported before Tailwind so CSS variables are */
+/* available to Tailwind's base layer at build time.                    */
+@import '../shared/styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Base layer overrides: typography, focus, scrollbar */
+@import '../shared/styles/theme.css';

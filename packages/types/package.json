@@ -1,0 +1,26 @@
+{
+  "name": "@church-flow/types",
+  "version": "0.0.1",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src --ext .ts",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@church-flow/eslint-config": "workspace:*",
+    "@church-flow/tsconfig": "workspace:*",
+    "eslint": "^8.57.0",
+    "typescript": "^5.6.0"
+  }
+}

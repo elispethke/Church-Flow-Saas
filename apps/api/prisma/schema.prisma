@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+// ─── Church (Tenant) ──────────────────────────────────────────────────────────
+// Every business table that belongs to a church carries churchId (row-level
+// multi-tenancy). Slug is globally unique — used in sub-domain / URL routing.
+
+model Church {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  users User[]
+  roles Role[]
+
+  @@index([slug])
+  @@map("churches")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+// One user belongs to exactly one church (V1 constraint).
+// email is unique per tenant (@@unique [churchId, email]).
+// passwordHash is NEVER returned by the API — enforced at the service layer.
+
+model User {
+  id           String     @id @default(uuid())
+  churchId     String     @map("church_id")
+  firstName    String     @map("first_name")
+  lastName     String     @map("last_name")
+  email        String
+  passwordHash String     @map("password_hash")
+  status       UserStatus @default(PENDING)
+  isActive     Boolean    @default(true) @map("is_active")
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  church        Church         @relation(fields: [churchId], references: [id])
+  userRoles     UserRole[]
+  refreshTokens RefreshToken[]
+
+  // email unique per tenant — prevents cross-church email collisions
+  @@unique([churchId, email])
+  // churchId index for tenant-scoped queries (most common access pattern)
+  @@index([churchId])
+  // email index for login lookups
+  @@index([email])
+  // composite for listing active users within a church
+  @@index([churchId, status])
+  @@map("users")
+}
+
+// ─── Role ─────────────────────────────────────────────────────────────────────
+// Roles are scoped per church. The same name (e.g., ADMIN) may exist in
+// multiple churches — @@unique enforces uniqueness within a single tenant.
+
+model Role {
+  id          String   @id @default(uuid())
+  churchId    String   @map("church_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  church          Church           @relation(fields: [churchId], references: [id])
+  userRoles       UserRole[]
+  rolePermissions RolePermission[]
+
+  // role name unique per tenant
+  @@unique([churchId, name])
+  @@index([churchId])
+  @@map("roles")
+}
+
+// ─── Permission ───────────────────────────────────────────────────────────────
+// Permissions are global (not tenant-scoped). They represent system capabilities
+// and are assigned to Roles. code follows the "resource.action" convention.
+
+model Permission {
+  id          String   @id @default(uuid())
+  code        String   @unique
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  rolePermissions RolePermission[]
+
+  // code is already @unique so Postgres creates a unique index automatically;
+  // adding a plain index would be redundant — the unique index handles lookups.
+  @@map("permissions")
+}
+
+// ─── UserRole (Junction) ──────────────────────────────────────────────────────
+// Composite PK (userId, roleId) prevents duplicate assignments.
+// Cascade delete: removing a user or role cleans up assignments automatically.
+
+model UserRole {
+  userId    String   @map("user_id")
+  roleId    String   @map("role_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── RolePermission (Junction) ────────────────────────────────────────────────
+// Composite PK (roleId, permissionId) prevents duplicate assignments.
+// Cascade delete: removing a role or permission cleans up assignments.
+
+model RolePermission {
+  roleId       String   @map("role_id")
+  permissionId String   @map("permission_id")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ─── RefreshToken ─────────────────────────────────────────────────────────────
+// Stores the Argon2id hash of the refresh token — never the raw token.
+// revokedAt IS NULL = token is live. Rotated on every use (each use revokes
+// the previous token and issues a new one).
+// Cascade delete: removing a user invalidates all their sessions.
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // userId index for "revoke all sessions for user" operations
+  @@index([userId])
+  // tokenHash index for token validation lookups (hot path on every API call)
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}

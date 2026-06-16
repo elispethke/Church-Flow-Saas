@@ -1,0 +1,84 @@
+export enum UserRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  CHURCH_ADMIN = 'CHURCH_ADMIN',
+  TREASURER = 'TREASURER',
+  SECRETARY = 'SECRETARY',
+  DEPARTMENT_LEADER = 'DEPARTMENT_LEADER',
+  VIEWER = 'VIEWER',
+}
+
+export enum ChurchStatus {
+  PENDING = 'PENDING',
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  SUSPENDED = 'SUSPENDED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum SubscriptionStatus {
+  TRIAL = 'TRIAL',
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  SUSPENDED = 'SUSPENDED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum TransactionType {
+  INCOME = 'INCOME',
+  EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER',
+}
+
+export enum TransactionStatus {
+  CONFIRMED = 'CONFIRMED',
+  PENDING = 'PENDING',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum AssetCondition {
+  EXCELLENT = 'EXCELLENT',
+  GOOD = 'GOOD',
+  REGULAR = 'REGULAR',
+  POOR = 'POOR',
+}
+
+export enum AssetStatus {
+  ACTIVE = 'ACTIVE',
+  MAINTENANCE = 'MAINTENANCE',
+  TRANSFERRED = 'TRANSFERRED',
+  DONATED = 'DONATED',
+  DISCARDED = 'DISCARDED',
+}
+
+export enum EventStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum AuditAction {
+  CREATE = 'CREATE',
+  UPDATE = 'UPDATE',
+  DELETE = 'DELETE',
+  LOGIN = 'LOGIN',
+  LOGOUT = 'LOGOUT',
+  LOGIN_FAILED = 'LOGIN_FAILED',
+  PASSWORD_RESET = 'PASSWORD_RESET',
+  INVITE = 'INVITE',
+  INVITE_ACCEPTED = 'INVITE_ACCEPTED',
+  REVOKE = 'REVOKE',
+  DEACTIVATE = 'DEACTIVATE',
+}
+
+export enum AuditModule {
+  AUTH = 'AUTH',
+  USERS = 'USERS',
+  CHURCHES = 'CHURCHES',
+  DEPARTMENTS = 'DEPARTMENTS',
+  FINANCE = 'FINANCE',
+  ASSETS = 'ASSETS',
+  EVENTS = 'EVENTS',
+  BILLING = 'BILLING',
+  SETTINGS = 'SETTINGS',
+}

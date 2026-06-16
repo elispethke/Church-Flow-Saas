@@ -1,0 +1,12 @@
+{
+  "extends": "@church-flow/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "noEmit": false
+  },
+  "include": ["src"],
+  "exclude": ["node_modules", "dist"]
+}

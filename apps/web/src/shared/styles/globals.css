@@ -1,0 +1,6 @@
+/* ─── Church Flow Design System ───────────────────────────────────────────── */
+/* Aggregator — import this file to get tokens + base styles without          */
+/* Tailwind directives. Use app/globals.css as the Vite build entry point.    */
+
+@import './tokens.css';
+@import './theme.css';

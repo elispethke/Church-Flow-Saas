@@ -1,0 +1,12 @@
+{
+  "extends": "@church-flow/tsconfig/nestjs.json",
+  "compilerOptions": {
+    "baseUrl": "./",
+    "outDir": "./dist",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src", "test"],
+  "exclude": ["node_modules", "dist"]
+}
